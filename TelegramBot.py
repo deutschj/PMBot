@@ -27,7 +27,7 @@ def start(update, context):
     keyboard = [[InlineKeyboardButton("Deutsch", callback_data='GPM_Prince_DE'), InlineKeyboardButton("English", callback_data='GPM_Prince_EN')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text('Please choose: ', reply_markup=reply_markup)
-
+#test test
 def echo(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
 
