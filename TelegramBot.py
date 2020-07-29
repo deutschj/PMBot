@@ -34,14 +34,14 @@ def AskDepartment(update, context):
         cursor.execute("SELECT DepartmentEn FROM Department")
     temp = []
     for counter, departments in enumerate(cursor.fetchall()):
-        temp.append(departments)
+        temp.append(departments.strip().strip(","))
         if counter % 2 == 1:
             keyboard.append(temp)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text('Please choose a department: ', reply_markup=reply_markup)
 
-
+#test
 def start(update, context):
     global userId
     userId = update.effective_chat.id
