@@ -70,6 +70,7 @@ def start(update, context):
 
 def echo(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+    AskDepartment(update, context)
 
 # def abc(update, context):
 #     context.bot.send_message(chat_id=update.effective_chat.id, text="You said abc :D")
@@ -78,7 +79,7 @@ def button(update, context):
     query.answer()
     query.edit_message_text(text="Selected answer: {}".format(query.data))
     user_credentials.append(query.data)
-    AskDepartment(update, context)
+    
     # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
     # conn.commit() 
     # print("committed INSERT...")
