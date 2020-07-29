@@ -16,7 +16,7 @@ dbpath = os.path.abspath("ConfigDB.accdb")
 conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
 
-def AskLanguage(update, context):
+def ChangeLanguage(update, context):
     userId = update.effective_chat.id
     # context.bot.send_message(chat_id=update.effective_chat.id, text="Hello, " + str(update.message.chat.first_name) + " I'm a bot")
     # Tastatur soll die Namen der Sprachentabelle zurückgeben
@@ -51,7 +51,8 @@ def check_user_existing(update):
     return False
     
 def start(update, context):
-    userId = update.effective_chat.id   
+    userId = update.effective_chat.id
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Um die Sprache zu ändern tippen Sie /language")   
     if check_user_existing(update):
         context.bot.send_message(chat_id=update.effective_chat.id, text="Willkommen zurück, " + str(update.message.chat.first_name))
     else:
@@ -60,13 +61,9 @@ def start(update, context):
         context.bot.send_message(chat_id=update.effective_chat.id, text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
         AskDepartment(update, context)
 
-        
-
 def echo(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
 
-# def abc(update, context):
-#     context.bot.send_message(chat_id=update.effective_chat.id, text="You said abc :D")
 def button(update, context):
     query = update.callback_query
     query.answer()
@@ -79,15 +76,17 @@ def button(update, context):
 
     cursor.execute("UPDATE Users SET " + str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
     conn.commit()
-    # query.edit_message_text(text="Selected answer: {}".format(query.data))
+    query.edit_message_text(text="Danke für die Eingabe")
 
     # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
     # conn.commit() 
     # print("committed INSERT...")
 
 start_handler = CommandHandler('start', start)
+language_handler = CommandHandler('language', ChangeLanguage)
 dispatcher.add_handler(CallbackQueryHandler(button))
 dispatcher.add_handler(start_handler)
+dispatcher.add_handler(language_handler)
 
 echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
 dispatcher.add_handler(echo_handler)
