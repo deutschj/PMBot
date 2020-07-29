@@ -16,71 +16,71 @@ dbpath = os.path.abspath("ConfigDB.accdb")
 conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
 
-user_credentials = []
-#test
-
 def AskLanguage(update, context):
-
+    userId = update.effective_chat.id
     # context.bot.send_message(chat_id=update.effective_chat.id, text="Hello, " + str(update.message.chat.first_name) + " I'm a bot")
     # Tastatur soll die Namen der Sprachentabelle zurückgeben
-    keyboard = [[InlineKeyboardButton("Deutsch", callback_data='GPM_Prince_DE'), InlineKeyboardButton("English", callback_data='GPM_Prince_EN')]]
+    keyboard = [[InlineKeyboardButton("Deutsch", callback_data="LanguageSet;GPM_Prince_DE"), 
+    InlineKeyboardButton("English", callback_data="LanguageSet;GPM_Prince_EN")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Please choose a language: ', reply_markup=reply_markup)
+    update.message.reply_text('Bitte wählen Sie Ihre Sprache: ', reply_markup=reply_markup)
+
+    #cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
 
 def AskDepartment(update, context):
+    userId = update.effective_chat.id
     keyboard = []
-    if user_credentials[0].casefold() == "de":
-        cursor.execute("SELECT DepartmentDe FROM Department")
-    else:
-        cursor.execute("SELECT DepartmentEn FROM Department")
+
+    cursor.execute("SELECT DepartmentDe FROM Department")
     temp = []
     for counter, departments in enumerate(cursor.fetchall()):
-        temp.append(departments.strip().strip(","))
+        dp = departments.DepartmentDe
+        temp.append(InlineKeyboardButton(dp.strip().strip(","), callback_data="Department;" + dp.strip().strip(",")))
         if counter % 2 == 1:
             keyboard.append(temp)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Please choose a department: ', reply_markup=reply_markup)
+    update.message.reply_text('Bitte wählen Sie Ihre Abteilung: ', reply_markup=reply_markup)
 
-#test
-def start(update, context):
-    global userId
+def check_user_existing(update):
     userId = update.effective_chat.id
-
     cursor.execute("SELECT UserId FROM Users")
-    userExist = False
     for userIdRow in cursor.fetchall():
         if userIdRow.UserId == userId:
-            context.bot.send_message(chat_id=update.effective_chat.id, text="Welcome back, " + str(update.message.chat.first_name))
-            conn.commit()
-            print("commited UPDATE...")
-            userExist = True
-            AskLanguage(update, context)  
-            break
-       
-    #if userExist == False:
-        #context.bot.send_message(chat_id=update.effective_chat.id, text="hello, " + str(update.message.chat.first_name) + " I'm a bot")
-        # Tastatur soll die Namen der Sprachentabelle zurückgeben
-        #keyboard = [[InlineKeyboardButton("Deutsch", callback_data='GPM_Prince_DE'), InlineKeyboardButton("English", callback_data='GPM_Prince_EN')]]
-        #reply_markup = InlineKeyboardMarkup(keyboard)
-        #update.message.reply_text('Please choose: ', reply_markup=reply_markup)
+            return True
+    return False
+    
+def start(update, context):
+    userId = update.effective_chat.id   
+    if check_user_existing(update):
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Willkommen zurück, " + str(update.message.chat.first_name))
+    else:
+        cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
+        conn.commit()
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
+        AskDepartment(update, context)
 
-        # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES ('" + userId + "', '" + query.data + "');")
-        # cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", query.data, userId)
         
 
 def echo(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
-    AskDepartment(update, context)
 
 # def abc(update, context):
 #     context.bot.send_message(chat_id=update.effective_chat.id, text="You said abc :D")
 def button(update, context):
     query = update.callback_query
     query.answer()
-    query.edit_message_text(text="Selected answer: {}".format(query.data))
-    user_credentials.append(query.data)
-    
+    userId = update.effective_chat.id   
+
+    Data = query.data.split(";")
+    # for i in Data:
+    #     print(i)
+    #     print(type(i))
+
+    cursor.execute("UPDATE Users SET " + str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
+    conn.commit()
+    # query.edit_message_text(text="Selected answer: {}".format(query.data))
+
     # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
     # conn.commit() 
     # print("committed INSERT...")
