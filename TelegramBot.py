@@ -17,6 +17,7 @@ conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+
 cursor = conn.cursor()
 
 user_credentials = []
+#test
 
 def AskLanguage(update, context):
 
