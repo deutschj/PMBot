@@ -30,7 +30,6 @@ def ChangeLanguage(update, context):
 
     # cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
 
-
 def AskDepartment(update, context):
     userId = update.effective_chat.id
     keyboard = []
@@ -48,7 +47,6 @@ def AskDepartment(update, context):
     update.message.reply_text(
         'Bitte wählen Sie Ihre Abteilung: ', reply_markup=reply_markup)
 
-
 def check_user_existing(update):
     userId = update.effective_chat.id
     cursor.execute("SELECT UserId FROM Users")
@@ -56,7 +54,6 @@ def check_user_existing(update):
         if userIdRow.UserId == userId:
             return True
     return False
-
 
 def start(update, context):
     userId = update.effective_chat.id
@@ -73,10 +70,10 @@ def start(update, context):
                                  text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
         AskDepartment(update, context)
 
-
 def echo(update, context):
     userId = update.effective_chat.id
     # Endungen bei input beachten
+    # Umlaute, Satzzeichen, 
     input_text = set(update.message.text.casefold().split(" "))
     cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
     language = cursor.fetchone().LanguageSet
@@ -93,10 +90,12 @@ def echo(update, context):
 
     for word in input_text:
         if word in keywords:
-            cursor.execute("SELECT Definition FROM '" + language + "' WHERE Titel = ? AND Datenbasis = ?", word, database)
+            cursor.execute("SELECT Definition FROM " + language + " WHERE Titel = ? AND Datenbasis = ?", word, database)
             # cursor.fetchone
-
-
+            print("success!")
+            response = str(cursor.fetchone().Definition)
+            context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+    
 def button(update, context):
     query = update.callback_query
     query.answer()
@@ -107,15 +106,13 @@ def button(update, context):
     #     print(i)
     #     print(type(i))
 
-    cursor.execute("UPDATE Users SET " +
-                   str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
+    cursor.execute("UPDATE Users SET " + str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
     conn.commit()
     query.edit_message_text(text="Danke für die Eingabe")
 
     # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
     # conn.commit()
     # print("committed INSERT...")
-
 
 start_handler = CommandHandler('start', start)
 language_handler = CommandHandler('language', ChangeLanguage)
