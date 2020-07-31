@@ -91,8 +91,7 @@ def echo(update, context):
     keywords = cursor.fetchall().Titel
     for word in input_text:
         if word in keywords:
-            cursor.execute("SELECT Definition FROM '" + language +
-                           "' WHERE Titel = ? AND atenbasis = ?", word, database)
+            cursor.execute("SELECT Definition FROM '" + language + "' WHERE Titel = ? AND atenbasis = ?", word, database)
             # cursor.fetchone
 
 
