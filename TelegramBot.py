@@ -14,8 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 dbpath = os.path.abspath("ConfigDB.accdb")
-conn = pyodbc.connect(
-    r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
+conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
 
 
@@ -88,7 +87,10 @@ def echo(update, context):
     else:
         cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis = ?;", "prince2")
         database = "prince2"
-    keywords = cursor.fetchall().Titel
+    
+    keywords = cursor.fetchall()
+    keywords = [x.Titel for x in keywords]
+
     for word in input_text:
         if word in keywords:
             cursor.execute("SELECT Definition FROM '" + language + "' WHERE Titel = ? AND Datenbasis = ?", word, database)
