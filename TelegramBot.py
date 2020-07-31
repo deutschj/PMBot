@@ -5,27 +5,32 @@ import os
 import time
 from telegram.ext import MessageHandler, Filters
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-updater = Updater(token='1298615678:AAGUe-rqG2A8tQnlTPwQB6GUFZfqKIze1Kk', use_context=True)
+updater = Updater(
+    token='1298615678:AAGUe-rqG2A8tQnlTPwQB6GUFZfqKIze1Kk', use_context=True)
 
 
 dispatcher = updater.dispatcher
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                     level=logging.INFO)
+                    level=logging.INFO)
 
 dbpath = os.path.abspath("ConfigDB.accdb")
-conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
+conn = pyodbc.connect(
+    r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
+
 
 def ChangeLanguage(update, context):
     userId = update.effective_chat.id
     # context.bot.send_message(chat_id=update.effective_chat.id, text="Hello, " + str(update.message.chat.first_name) + " I'm a bot")
     # Tastatur soll die Namen der Sprachentabelle zurückgeben
-    keyboard = [[InlineKeyboardButton("Deutsch", callback_data="LanguageSet;GPM_Prince_DE"), 
-    InlineKeyboardButton("English", callback_data="LanguageSet;GPM_Prince_EN")]]
+    keyboard = [[InlineKeyboardButton("Deutsch", callback_data="LanguageSet;GPM_Prince_DE"),
+                 InlineKeyboardButton("English", callback_data="LanguageSet;GPM_Prince_EN")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Bitte wählen Sie Ihre Sprache: ', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Bitte wählen Sie Ihre Sprache: ', reply_markup=reply_markup)
 
-    #cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
+    # cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
+
 
 def AskDepartment(update, context):
     userId = update.effective_chat.id
@@ -35,12 +40,15 @@ def AskDepartment(update, context):
     temp = []
     for counter, departments in enumerate(cursor.fetchall()):
         dp = departments.DepartmentDe
-        temp.append(InlineKeyboardButton(dp.strip().strip(","), callback_data="Department;" + dp.strip().strip(",")))
+        temp.append(InlineKeyboardButton(dp.strip().strip(","),
+                                         callback_data="Department;" + dp.strip().strip(",")))
         if counter % 2 == 1:
             keyboard.append(temp)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Bitte wählen Sie Ihre Abteilung: ', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Bitte wählen Sie Ihre Abteilung: ', reply_markup=reply_markup)
+
 
 def check_user_existing(update):
     userId = update.effective_chat.id
@@ -49,38 +57,64 @@ def check_user_existing(update):
         if userIdRow.UserId == userId:
             return True
     return False
-    
+
+
 def start(update, context):
     userId = update.effective_chat.id
-    context.bot.send_message(chat_id=update.effective_chat.id, text="Um die Sprache zu ändern tippen Sie /language")   
+    context.bot.send_message(chat_id=update.effective_chat.id,
+                             text="Um die Sprache zu ändern tippen Sie /language")
     if check_user_existing(update):
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Willkommen zurück, " + str(update.message.chat.first_name))
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                 text="Willkommen zurück, " + str(update.message.chat.first_name))
     else:
-        cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
+        cursor.execute(
+            "INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
         conn.commit()
-        context.bot.send_message(chat_id=update.effective_chat.id, text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                 text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
         AskDepartment(update, context)
 
+
 def echo(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+    userId = update.effective_chat.id
+    # Endungen bei input beachten
+    input_text = set(update.message.text.casefold().split(" "))
+    cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
+    language = cursor.fetchone().LanguageSet
+    print(language)
+    if "gpm" in input_text:
+        cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis= ?", "gpm")
+        database = "gpm"
+    else:
+        cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis = ?;", "prince2")
+        database = "prince2"
+    keywords = cursor.fetchall().Titel
+    for word in input_text:
+        if word in keywords:
+            cursor.execute("SELECT Definition FROM '" + language +
+                           "' WHERE Titel = ? AND atenbasis = ?", word, database)
+            # cursor.fetchone
+
 
 def button(update, context):
     query = update.callback_query
     query.answer()
-    userId = update.effective_chat.id   
+    userId = update.effective_chat.id
 
     Data = query.data.split(";")
     # for i in Data:
     #     print(i)
     #     print(type(i))
 
-    cursor.execute("UPDATE Users SET " + str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
+    cursor.execute("UPDATE Users SET " +
+                   str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
     conn.commit()
     query.edit_message_text(text="Danke für die Eingabe")
 
     # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
-    # conn.commit() 
+    # conn.commit()
     # print("committed INSERT...")
+
 
 start_handler = CommandHandler('start', start)
 language_handler = CommandHandler('language', ChangeLanguage)
