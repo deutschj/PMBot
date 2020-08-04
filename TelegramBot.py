@@ -2,6 +2,8 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 import logging
 import pyodbc
 import os
+import re
+from flashtext import KeywordProcessor
 import time
 from telegram.ext import MessageHandler, Filters
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -67,35 +69,61 @@ def start(update, context):
             "INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
         conn.commit()
         context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text="Hallo, ich bin der PMBot. Bitte geben Sie zunächst Ihre Abteilung an:")
+                                 text="Hallo, ich bin der PMBot.\nBitte geben Sie zunächst Ihre Abteilung an:")
         AskDepartment(update, context)
+
+
+def compare(input_string, keywords):
+    keyword_processor = KeywordProcessor()
+    [keyword_processor.add_keyword(k) for k in keywords]
+    return keyword_processor.extract_keywords(input_string)
+
+
+
+# def compare(input_string, language):
+
+#     cursor.execute("SELECT Titel FROM " + language )
+#     keywords = cursor.fetchall()
+#     keywords = [x.Titel for x in keywords]
+#     print(keywords)
+#     stripped_text = re.sub('[^A-Za-z0-9 ]+', '', input_string)
+#     matching_list = []
+#     for word in keywords:
+
+#         if word in input_string:
+#             if word in matching_list[0]:
+#                 matching_list.append(word)
+#     matching_list = sorted(matching_list, key = len)
+#     print(matching_list)
 
 def echo(update, context):
     userId = update.effective_chat.id
     # Endungen bei input beachten
     # Umlaute, Satzzeichen, 
-    input_text = set(update.message.text.casefold().split(" "))
+    stripped_text = re.sub('[^A-Za-z0-9 ]+', '', update.message.text)
+    
     cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
     language = cursor.fetchone().LanguageSet
     print(language)
-    if "gpm" in input_text:
+    if "gpm" in stripped_text:
         cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis= ?", "gpm")
         database = "gpm"
     else:
         cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis = ?;", "prince2")
         database = "prince2"
-    
     keywords = cursor.fetchall()
     keywords = [x.Titel for x in keywords]
-
-    for word in input_text:
-        if word in keywords:
-            cursor.execute("SELECT Definition FROM " + language + " WHERE Titel = ? AND Datenbasis = ?", word, database)
-            # cursor.fetchone
+    responses = compare(stripped_text, keywords)
+    if len(responses) > 0: 
+        for keyword in responses:
+            print(keyword) #project management phases product structure plan gpm
+            cursor.execute("SELECT Definition FROM " + language + " WHERE Titel = ? AND Datenbasis = ?", keyword, database)
             print("success!")
-            response = str(cursor.fetchone().Definition)
+            response = keyword + ":\n"
+            response += str(cursor.fetchone().Definition)
             context.bot.send_message(chat_id=update.effective_chat.id, text=response)
-    
+    else:
+        
 def button(update, context):
     query = update.callback_query
     query.answer()
