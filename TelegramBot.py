@@ -16,7 +16,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 dbpath = os.path.abspath("ConfigDB.accdb")
-conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
+conn = pyodbc.connect(
+    r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
 
 
@@ -31,6 +32,7 @@ def ChangeLanguage(update, context):
         'Bitte wählen Sie Ihre Sprache: ', reply_markup=reply_markup)
 
     # cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
+
 
 def AskDepartment(update, context):
     userId = update.effective_chat.id
@@ -49,6 +51,7 @@ def AskDepartment(update, context):
     update.message.reply_text(
         'Bitte wählen Sie Ihre Abteilung: ', reply_markup=reply_markup)
 
+
 def check_user_existing(update):
     userId = update.effective_chat.id
     cursor.execute("SELECT UserId FROM Users")
@@ -57,51 +60,21 @@ def check_user_existing(update):
             return True
     return False
 
+
 def start(update, context):
     userId = update.effective_chat.id
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                             text="Um die Sprache zu ändern tippen Sie /language")
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Um die Sprache zu ändern tippen Sie /language")
     if check_user_existing(update):
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text="Willkommen zurück, " + str(update.message.chat.first_name))
     else:
-        cursor.execute(
-            "INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
+        cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
         conn.commit()
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text="Hallo, ich bin der PMBot.\nBitte geben Sie zunächst Ihre Abteilung an:")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Hallo, ich bin der PMBot.\nBitte geben Sie zunächst Ihre Abteilung an:")
         AskDepartment(update, context)
 
 
-def compare(input_string, keywords):
-    keyword_processor = KeywordProcessor()
-    [keyword_processor.add_keyword(k) for k in keywords]
-    return keyword_processor.extract_keywords(input_string)
-
-
-
-# def compare(input_string, language):
-
-#     cursor.execute("SELECT Titel FROM " + language )
-#     keywords = cursor.fetchall()
-#     keywords = [x.Titel for x in keywords]
-#     print(keywords)
-#     stripped_text = re.sub('[^A-Za-z0-9 ]+', '', input_string)
-#     matching_list = []
-#     for word in keywords:
-
-#         if word in input_string:
-#             if word in matching_list[0]:
-#                 matching_list.append(word)
-#     matching_list = sorted(matching_list, key = len)
-#     print(matching_list)
-
-def echo(update, context):
-    userId = update.effective_chat.id
-    # Endungen bei input beachten
-    # Umlaute, Satzzeichen, 
-    stripped_text = re.sub('[^A-Za-z0-9 ]+', '', update.message.text)
-    
+def select_base(userId, stripped_text):
     cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
     language = cursor.fetchone().LanguageSet
     print(language)
@@ -111,36 +84,53 @@ def echo(update, context):
     else:
         cursor.execute("SELECT Titel FROM " + language + " WHERE Datenbasis = ?;", "prince2")
         database = "prince2"
+    return database
+
+
+def compare(input_string, keywords):
+    keyword_processor = KeywordProcessor()
+    [keyword_processor.add_keyword(k) for k in keywords]
+    return keyword_processor.extract_keywords(input_string)
+
+
+def echo(update, context):
+    userId = update.effective_chat.id
+    stripped_text = re.sub('[^A-Za-z0-9 ]+', '', update.message.text)
+    # Endungen bei input beachten
+    # Umlaute, Satzzeichen,
+    database = select_base(userId, stripped_text)
     keywords = cursor.fetchall()
     keywords = [x.Titel for x in keywords]
     responses = compare(stripped_text, keywords)
-    if len(responses) > 0: 
+    
+    if len(responses) > 0:
         for keyword in responses:
-            print(keyword) #project management phases product structure plan gpm
-            cursor.execute("SELECT Definition FROM " + language + " WHERE Titel = ? AND Datenbasis = ?", keyword, database)
+            print(keyword)
+            cursor.execute("SELECT Definition FROM " + language +
+                           " WHERE Titel = ? AND Datenbasis = ?", keyword, database)
             print("success!")
-            response = keyword + ":\n"
+            response = keyword.capitalize() + " (" + database.capitalize() + ")" + ":\n"
             response += str(cursor.fetchone().Definition)
-            context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id, text=response)
     else:
-        
+        response = database.capitalize() + " Schlüsselwörter: \n"
+        response += ";  ".join([k.capitalize() for k in keywords])
+        context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+
+
 def button(update, context):
     query = update.callback_query
     query.answer()
     userId = update.effective_chat.id
 
     Data = query.data.split(";")
-    # for i in Data:
-    #     print(i)
-    #     print(type(i))
-
-    cursor.execute("UPDATE Users SET " + str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
+   
+    cursor.execute("UPDATE Users SET " +
+                   str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
     conn.commit()
     query.edit_message_text(text="Danke für die Eingabe")
 
-    # cursor.execute("INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, query.data)
-    # conn.commit()
-    # print("committed INSERT...")
 
 start_handler = CommandHandler('start', start)
 language_handler = CommandHandler('language', ChangeLanguage)
@@ -151,7 +141,5 @@ dispatcher.add_handler(language_handler)
 echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
 dispatcher.add_handler(echo_handler)
 
-# abc_handler = CommandHandler('abc', abc)
-# dispatcher.add_handler(abc_handler)
 updater.start_polling()
 updater.idle()
