@@ -2,9 +2,11 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 import logging
 import pyodbc
 import os
+import random
+import datetime
 import re
+import threading
 from flashtext import KeywordProcessor
-import time
 from telegram.ext import MessageHandler, Filters
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 updater = Updater(
@@ -16,12 +18,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 dbpath = os.path.abspath("ConfigDB.accdb")
-conn = pyodbc.connect(
-    r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
+conn = pyodbc.connect(r'Driver={Microsoft Access Driver (*.mdb, *.accdb)};DBQ='+dbpath+';')
 cursor = conn.cursor()
 
 
+
+
 def ChangeLanguage(update, context):
+    global bot
     userId = update.effective_chat.id
     # context.bot.send_message(chat_id=update.effective_chat.id, text="Hello, " + str(update.message.chat.first_name) + " I'm a bot")
     # Tastatur soll die Namen der Sprachentabelle zurückgeben
@@ -33,6 +37,20 @@ def ChangeLanguage(update, context):
 
     # cursor.execute("UPDATE Users SET LanguageSet = ? WHERE UserId = ?", , userId)
 
+
+def check_user_offline():
+    today = datetime.date.today
+    cursor.execute("SELECT * FROM Users")
+    last_messages = [(datetime.date(x.LastMessageSent), x.UserId) for x in cursor.fetchall()]
+    for last_message in last_messages:
+        time_dif = today - last_message[1]
+        if time_dif.day >= 15:
+            bot.send_message(
+            chat_id=last_message[0], text="Eyy du, schreib mal wieder!")
+            
+if __name__ == "__main__":
+    t1 = threading.Thread(name="check_user_offline", target=check_user_offline())
+    t1.start()
 
 def AskDepartment(update, context):
     userId = update.effective_chat.id
@@ -66,6 +84,7 @@ def update_time(update):
 
 
 def start(update, context):
+    bot = context.bot
     userId = update.effective_chat.id
     context.bot.send_message(chat_id=update.effective_chat.id,
                              text="Um die Sprache zu ändern tippen Sie /language")
@@ -82,10 +101,42 @@ def start(update, context):
 
 
 def quiz(update, context):
-    markup = ReplyKeyboardMarkup(
-        keyboard=[['1', '2']], one_time_keyboard=True, resize_keyboard=True)
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                             text="/1 Test 1 \n /2 Test 2", reply_markup=markup)
+    userId = update.effective_chat.id
+    cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
+    language = cursor.fetchone().LanguageSet
+    cursor.execute("SELECT Titel FROM " + language)
+    temp = [] 
+    keyboard = []
+    if "DE" in language:
+        dp = [x.Titel.capitalize() for x in cursor.fetchall()]
+    else:
+        dp = [x.Titel for x in cursor.fetchall()]
+    
+    random.shuffle(dp)
+    dp = dp[:5]
+    right_answer = random.randrange(0, 4)
+    cursor.execute("SELECT Definition FROM " + language + " WHERE Titel = ?", dp[right_answer])
+    question = cursor.fetchone().Definition
+    question = question.replace(dp[right_answer], "****")
+    cursor.execute("SELECT Datenbasis FROM " + language +" WHERE Titel = ?", dp[right_answer])
+    database = cursor.fetchone().Datenbasis
+    for i in range(0, 4):
+        if i == right_answer:
+            temp.append(InlineKeyboardButton(dp[i].strip().strip(","),
+                                        callback_data="right_answer;" + dp[right_answer].strip().strip(",")))
+        else:
+            temp.append(InlineKeyboardButton(dp[i].strip().strip(","),
+                                        callback_data="wrong_answer;" + dp[right_answer].strip().strip(",")))
+        
+        if i % 2 == 1:
+            keyboard.append(temp)
+            temp = []
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    question = "Welches Keyword passt zur Definition der Datenbasis " + database.upper() + "?:\n\n" + question
+    update.message.reply_text(
+        question, reply_markup=reply_markup)
+
 
 
 def select_base(userId, stripped_text, language):
@@ -144,10 +195,22 @@ def button(update, context):
 
     Data = query.data.split(";")
 
-    cursor.execute("UPDATE Users SET " +
-                   str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
-    conn.commit()
-    query.edit_message_text(text="Eingabe gespeichert")
+    if "answer" in Data[0]:
+        if Data[0] == "right_answer":
+            query.edit_message_reply_markup(inline_message_id=query.inline_message_id,
+                            reply_markup= None)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id, text="Richtige Antwort")    
+        else:
+            query.edit_message_reply_markup(inline_message_id=query.inline_message_id,
+                            reply_markup= None)
+            context.bot.send_message(
+                chat_id=update.effective_chat.id, text="Falsche Antwort. Du Idiot. Richtig wäre " + Data[1] + " gewesen.")
+    else: 
+        cursor.execute("UPDATE Users SET " +
+                    str(Data[0]) + " = ? WHERE UserId = ?", Data[1], userId)
+        conn.commit()
+        query.edit_message_text(text="Eingabe gespeichert")
 
 
 start_handler = CommandHandler('start', start)
