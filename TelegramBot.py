@@ -225,6 +225,7 @@ def echo(update, context):
             context.bot.send_message(
                 chat_id=update.effective_chat.id, text=response)
     else:
+        #Nach 3 mal weiterleiten
         response = database.capitalize() + " Schlüsselwörter / keywords: \n"
         response += ";  ".join([k.capitalize() for k in keywords])
         context.bot.send_message(
