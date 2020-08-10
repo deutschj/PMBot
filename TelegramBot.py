@@ -109,32 +109,36 @@ def update_time(update):
 
 def start(update, context):
     bot = context.bot
-    userId = update.effective_chat.id
-    language = get_user_language(userId)
+    userId = update.effective_chat.id    
     if check_user_existing(update):
+        language = get_user_language(userId)
         if "GPM_Prince_DE" in language:
             response = "Willkommen zurück, "
         else:
             response = "Welcome back, "
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text= response + str(update.message.chat.first_name))
-    else:
+    else:       
         cursor.execute(
             "INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
         conn.commit()
+        language = get_user_language(userId)
+        ChangeLanguage(update, context)
+        AskDepartment(update, context)
+        if "GPM_Prince_DE" in language:
+            context.bot.send_message(chat_id=update.effective_chat.id,
+                                text="Um die Sprache zu ändern tippen Sie /language.\nUm die Abteilung zu wechseln tippen Sie /department")
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id,
+                                text="To change your language, please type /language.\nTo change your department, please type /department.\nTo get an overview over all commands type /help")
+        
         if "GPM_Prince_DE" in language:
             response = "Hallo, ich bin der PMBot.\nBitte geben Sie zunächst Ihre Abteilung an:"
         else:
             response = "Hello, I am the PMBot.\nPlease select your department first:"
         context.bot.send_message(chat_id=update.effective_chat.id, text= response)
-        AskDepartment(update, context)
-    if "GPM_Prince_DE" in language:
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                             text="Um die Sprache zu ändern tippen Sie /language.\nUm die Abteilung zu wechseln tippen Sie /department")
-    else:
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                             text="To change your language, please type /language.\nTo change your department, please type /department.\nTo get an overview over all commands type /help")
-
+        
+        conn.commit()
 
 def quiz(update, context):
     userId = update.effective_chat.id
