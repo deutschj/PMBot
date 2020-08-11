@@ -41,8 +41,7 @@ def get_user_language(userId):
     return cursor.fetchone().LanguageSet.strip().strip(",")
     
 def check_user_offline():
-    while True:
-        
+    while True:        
         now = datetime.timestamp(datetime.now())
         cursor.execute("SELECT * FROM Users")
         last_messages = [(x.UserId, x.LastMessageSent)
@@ -67,19 +66,19 @@ def AskDepartment(update, context):
     userId = update.effective_chat.id
     keyboard = []
     language = get_user_language(userId)
-    if "GPM_Prince_DE" in language:
-        cursor.execute("SELECT DepartmentDe FROM Department")
-        dp = [departments.DepartmentDe for departments in cursor.fetchall()]
+    cursor.execute("SELECT * FROM Department")
+    if "GPM_Prince_DE" in language:  
+        dp = [(departments.DepartmentId, departments.DepartmentDe) for departments in cursor.fetchall()]
     else:
-        cursor.execute("SELECT DepartmentEn FROM Department")
-        dp = [departments.DepartmentEn for departments in cursor.fetchall()]
+        dp = [(departments.DepartmentId, departments.DepartmentEn) for departments in cursor.fetchall()]
     temp = []
-    for counter, departments in enumerate(dp):
-        temp.append(InlineKeyboardButton(departments.strip().strip(","),
-                                         callback_data="Department;" + departments.strip().strip(",")))
+    for counter, department in enumerate(dp):
+        temp.append(InlineKeyboardButton(department[1].strip().strip(","),
+                                         callback_data="Department;" + str(department[0])))
         if counter % 2 == 1:
             keyboard.append(temp)
-
+            temp = []
+    keyboard.append(temp)
     reply_markup = InlineKeyboardMarkup(keyboard)
     if "GPM_Prince_DE" in language:
         response = "Bitte wählen Sie Ihre Abteilung: "
@@ -122,23 +121,15 @@ def start(update, context):
         cursor.execute(
             "INSERT INTO Users(UserId, LanguageSet) VALUES (?,?);", userId, "GPM_Prince_DE")
         conn.commit()
-        language = get_user_language(userId)
-        ChangeLanguage(update, context)
+        # ChangeLanguage(update, context)
+        context.bot.send_message(chat_id=update.effective_chat.id, text="Hallo, Ich bin der PMBot.")
         AskDepartment(update, context)
-        if "GPM_Prince_DE" in language:
-            context.bot.send_message(chat_id=update.effective_chat.id,
-                                text="Um die Sprache zu ändern tippen Sie /language.\nUm die Abteilung zu wechseln tippen Sie /department")
-        else:
-            context.bot.send_message(chat_id=update.effective_chat.id,
-                                text="To change your language, please type /language.\nTo change your department, please type /department.\nTo get an overview over all commands type /help")
-        
-        if "GPM_Prince_DE" in language:
-            response = "Hallo, ich bin der PMBot.\nBitte geben Sie zunächst Ihre Abteilung an:"
-        else:
-            response = "Hello, I am the PMBot.\nPlease select your department first:"
-        context.bot.send_message(chat_id=update.effective_chat.id, text= response)
-        
-        conn.commit()
+
+    context.bot.send_message(chat_id=update.effective_chat.id,
+                                text="Um die Sprache zu ändern tippen Sie /language.\nUm die Abteilung zu wechseln tippen Sie /department.\nUm eine Übersicht über alle Kommandos zu erhalten, tippen Sie /help.")
+    context.bot.send_message(chat_id=update.effective_chat.id,
+                                text="To change your language, please type /language.\nTo change your department, please type /department.\nTo get an overview over all commands, please type /help.")
+    update_time(update)
 
 def quiz(update, context):
     userId = update.effective_chat.id
@@ -174,7 +165,7 @@ def quiz(update, context):
         if i % 2 == 1:
             keyboard.append(temp)
             temp = []
-
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     if "GPM_Prince_DE" in language:
             response = "Welches Keyword passt zur Definition der Datenbasis "
@@ -186,8 +177,6 @@ def quiz(update, context):
 
 
 def select_base(userId, stripped_text, language):
-
-    print(language)
     if "gpm" in stripped_text:
         cursor.execute("SELECT Titel FROM " + language +
                        " WHERE Datenbasis= ?", "gpm")
@@ -206,35 +195,38 @@ def compare(input_string, keywords):
 
 
 def echo(update, context):
-    update_time(update)
-    userId = update.effective_chat.id
-    cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
-    language = cursor.fetchone().LanguageSet
-    stripped_text = re.sub('[^A-Za-z0-9 ]+', '', update.message.text)
-    # Endungen bei input beachten
-    # Umlaute, Satzzeichen,
-    database = select_base(userId, stripped_text, language)
-    keywords = cursor.fetchall()
-    keywords = [x.Titel for x in keywords]
-    responses = compare(stripped_text, keywords)
+    if check_user_existing(update):
+        update_time(update)
+        userId = update.effective_chat.id
+        cursor.execute("SELECT LanguageSet FROM Users WHERE UserId = ?", userId)
+        language = cursor.fetchone().LanguageSet
+        stripped_text = re.sub('[^A-Za-z0-9 ]+', '', update.message.text)
+        # Endungen bei input beachten
+        # Umlaute, Satzzeichen,
+        database = select_base(userId, stripped_text, language)
+        keywords = cursor.fetchall()
+        keywords = [x.Titel for x in keywords]
+        responses = compare(stripped_text, keywords)
 
-    if len(responses) > 0:
-        for keyword in responses:
-            print(keyword)
-            cursor.execute("SELECT Definition FROM " + language +
-                           " WHERE Titel = ? AND Datenbasis = ?", keyword, database)
-            print("success!")
-            response = keyword.capitalize() + " (" + database.capitalize() + ")" + ":\n"
-            response += str(cursor.fetchone().Definition)
+        if len(responses) > 0:
+            for keyword in responses:
+                cursor.execute("SELECT Definition FROM " + language +
+                            " WHERE Titel = ? AND Datenbasis = ?", keyword, database)
+                response = keyword.capitalize() + " (" + database.capitalize() + ")" + ":\n"
+                response += str(cursor.fetchone().Definition)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id, text=response)
+                cursor.execute("UPDATE ? SET QuestionCount = QuestionCount + 1 WHERE Titel = ?", language, keyword)
+        else:
+            #Nach 3 mal weiterleiten
+            response = database.capitalize() + " Schlüsselwörter / keywords: \n"
+            response += ";  ".join([k.capitalize() for k in keywords])
             context.bot.send_message(
                 chat_id=update.effective_chat.id, text=response)
+        cursor.execute("UPDATE Users SET QuestionCount = QuestionCount + 1 WHERE UserId = ?", userId)
     else:
-        #Nach 3 mal weiterleiten
-        response = database.capitalize() + " Schlüsselwörter / keywords: \n"
-        response += ";  ".join([k.capitalize() for k in keywords])
-        context.bot.send_message(
-            chat_id=update.effective_chat.id, text=response)
-
+        context.bot.send_message(chat_id=update.effective_chat.id, text = "Du bist noch nicht registriert. Bitte rufe /start auf, um dich zu registrieren.")
+        context.bot.send_message(chat_id=update.effective_chat.id, text = "You are not registered yet. Please use /start to register.")
 
 def button(update, context):
     query = update.callback_query
@@ -265,15 +257,26 @@ def button(update, context):
         query.edit_message_text(text="✅")
 
 
+def help_(update, context):
+    if "GPM_Prince_DE" in get_user_language(update.effective_chat.id):
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                    text="Um die Sprache zu ändern tippen Sie /language.\nUm die Abteilung zu wechseln tippen Sie /department.\nUm eine Übersicht über alle Kommandos zu erhalten, tippen Sie /help.")     
+    else:
+        context.bot.send_message(chat_id=update.effective_chat.id,
+                                    text="To change your language, please type /language.\nTo change your department, please type /department.\nTo get an overview over all commands, please type /help.")
+
+
 start_handler = CommandHandler('start', start)
 language_handler = CommandHandler('language', ChangeLanguage) 
 department_handler = CommandHandler('department', AskDepartment)
 quiz_handler = CommandHandler('quiz', quiz)
+help_handler = CommandHandler('help', help_)
 dispatcher.add_handler(CallbackQueryHandler(button))
 dispatcher.add_handler(start_handler)
 dispatcher.add_handler(language_handler)
 dispatcher.add_handler(quiz_handler)
 dispatcher.add_handler(department_handler)
+dispatcher.add_handler(help_handler)
 
 echo_handler = MessageHandler(Filters.text & (~Filters.command), echo)
 dispatcher.add_handler(echo_handler)
