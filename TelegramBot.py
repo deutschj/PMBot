@@ -59,7 +59,7 @@ def check_user_offline():
 
 
 if __name__ == "__main__":
-    _thread.start_new_thread(check_user_offline) # separate thread for counting the time since last Bot usage
+    _thread.start_new_thread(check_user_offline, ()) # separate thread for counting the time since last Bot usage
 
 
 def AskDepartment(update, context):
