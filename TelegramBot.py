@@ -1,4 +1,5 @@
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 import logging
 import pyodbc
 import os
@@ -9,8 +10,7 @@ import re
 import time
 import _thread
 from flashtext import KeywordProcessor
-from telegram.ext import MessageHandler, Filters
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+
 updater = Updater(
     token='1298615678:AAGUe-rqG2A8tQnlTPwQB6GUFZfqKIze1Kk', use_context=True)
 bot = telegram.Bot(token='1298615678:AAGUe-rqG2A8tQnlTPwQB6GUFZfqKIze1Kk')
